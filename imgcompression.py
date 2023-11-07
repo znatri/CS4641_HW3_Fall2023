@@ -25,9 +25,19 @@ class ImgCompression(object):
             S: (min(N,D), ) numpy array for black and white images / (3,min(N,D)) numpy array for color images
             V^T: (D,D) numpy array for black and white images / (3,D,D) numpy array for color images
         """
-        if x.shape[0] == 1:
-            return np.lin
-        raise NotImplementedError
+        U, S, V = [], [], []
+        if X.ndim == 2:
+            U, S, V = np.linalg.svd(X)
+        else:
+            for i in range(3):
+                u, s, v = np.linalg.svd(X[i])
+                U.append(u)
+                S.append(s)
+                V.append(v)
+            U, S, V = np.array(U), np.array(S), np.array(V)
+        return U, S, V
+
+
 
     def compress(
         self, U: np.ndarray, S: np.ndarray, V: np.ndarray, k: int
