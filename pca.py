@@ -14,6 +14,11 @@ class PCA(object):
         self.U = None
         self.S = None
         self.V = None
+    
+    def center_data(self, data: np.ndarray) -> np.ndarray:
+        average = np.mean(data, axis=0, keepdims=True)
+        data_centered = data - average
+        return data_centered
 
     def fit(self, X: np.ndarray) -> None:  # 5 points
         """
@@ -36,7 +41,9 @@ class PCA(object):
             self.S: (min(N,D), ) numpy array
             self.V: (min(N,D), D) numpy array
         """
-        raise NotImplementedError
+        X_centered = self.center_data(X)
+        self.U, self.S, self.V = np.linalg.svd(X_centered, full_matrices=False)
+
 
     def transform(self, data: np.ndarray, K: int = 2) -> np.ndarray:  # 2 pts
         """
@@ -52,8 +59,10 @@ class PCA(object):
 
         Hint: Make sure you remember to first center your data by subtracting the mean of each feature.
         """
-        raise NotImplementedError
-
+        X_centered = self.center_data(data)
+        X_new = np.dot(X_centered, self.V[:K].T)
+        return X_new
+    
     def transform_rv(
         self, data: np.ndarray, retained_variance: float = 0.99
     ) -> np.ndarray:  # 3 pts
@@ -73,8 +82,12 @@ class PCA(object):
         Hint: Make sure you remember to first center your data by subtracting the mean of each feature.
 
         """
-        raise NotImplementedError
-
+        X_centered = self.center_data(data)
+        cumulative_variance = np.cumsum(self.S) / np.sum(self.S ** 2, axis=0)
+        K = np.argmax(cumulative_variance > retained_variance)
+        X_new = np.dot(X_centered, self.V[:K].T)
+        return X_new
+    
     def get_V(self) -> np.ndarray:
         """Getter function for value of V"""
 
@@ -93,5 +106,42 @@ class PCA(object):
 
         Return: None
         """
+        self.fit(X)
 
-        raise NotImplementedError
+        # Reduce dimensionailty to 2 using transform
+        X_new = self.transform(data=X, K=2)
+
+        df_2d = pd.DataFrame(data=X_new, columns=["x", "y"])
+        df_2d["label"] = y
+        plot_2d = px.scatter(
+            df_2d,
+            x="x",
+            y="y",
+            color="label",
+            title=fig_title + " (2D)",
+            labels={"x": "First PC", "y": "Second PC"},
+        )
+
+        # Reduce dimensionailty to 3 using transform
+        X_new = self.transform(data=X, K=3)
+
+        df_3d = pd.DataFrame(data=X_new, columns=["x", "y", "z"])
+        df_3d["label"] = y
+
+        plot_3d = px.scatter_3d(
+            df_3d,
+            x="x",
+            y="y",
+            z="z",
+            color="label",
+            title=fig_title + " (3D)",
+            labels={
+                "x" : "First PC",
+                "y" : "Second PC",
+                "z" : "Third PC",
+            },
+        )
+
+        plot_2d.show()
+        plot_3d.show()
+
