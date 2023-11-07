@@ -25,16 +25,10 @@ class ImgCompression(object):
             S: (min(N,D), ) numpy array for black and white images / (3,min(N,D)) numpy array for color images
             V^T: (D,D) numpy array for black and white images / (3,D,D) numpy array for color images
         """
-        U, S, V = [], [], []
         if X.ndim == 2:
             U, S, V = np.linalg.svd(X)
         else:
-            for i in range(3):
-                u, s, v = np.linalg.svd(X[i])
-                U.append(u)
-                S.append(s)
-                V.append(v)
-            U, S, V = np.array(U), np.array(S), np.array(V)
+            U, S, V = np.linalg.svd(X, full_matrices=True)
         return U, S, V
 
 
@@ -57,8 +51,16 @@ class ImgCompression(object):
                 V_compressed: (k, D) numpy array for black and white images / (3, k, D) numpy array for color images
         """
 
-        raise NotImplementedError
-
+        if U.ndim == 2:
+            U_compressed = U[:, :k]
+            S_compressed = S[:k]
+            V_compressed = V[:k, :]
+        else:
+            U_compressed = U[:, :, :k]
+            S_compressed = S[:, :k]
+            V_compressed = V[:, :k, :]
+        return U_compressed, S_compressed, V_compressed
+    
     def rebuild_svd(
         self,
         U_compressed: np.ndarray,
@@ -79,7 +81,12 @@ class ImgCompression(object):
         Hint: numpy.matmul may be helpful for reconstructing color images
         """
 
-        raise NotImplementedError
+        if U_compressed.ndim == 2:
+            Xrebuild = np.matmul(U_compressed * S_compressed, V_compressed)
+        else:
+            Xrebuild = np.matmul(U_compressed * S_compressed[:, None, :], V_compressed)
+        
+        return Xrebuild
 
     def compression_ratio(self, X: np.ndarray, k: int) -> float:  # [4pts]
         """
@@ -92,8 +99,13 @@ class ImgCompression(object):
         Return:
             compression_ratio: float of proportion of storage used by compressed image
         """
-
-        raise NotImplementedError
+        orig = np.prod(X.shape)
+        if X.ndim == 2:
+            compressed = k * (1 + sum(X.shape[:]))
+        else:
+            compressed = k * (1 + sum(X.shape[1:])) * X.shape[0]
+        ratio = compressed / orig
+        return ratio
 
     def recovered_variance_proportion(self, S: np.ndarray, k: int) -> float:  # [4pts]
         """
@@ -106,8 +118,14 @@ class ImgCompression(object):
         Return:
            recovered_var: float (array of 3 floats for color image) corresponding to proportion of recovered variance
         """
-
-        raise NotImplementedError
+        if S.ndim == 1:
+            recovered_var = np.sum(S[:k] ** 2) / np.sum(S ** 2)
+        else:
+            recovered_var = np.zeros(S.shape[0])
+            for i in range(S.shape[0]):
+                recovered_var[i] = np.sum(S[i, :k] ** 2) / np.sum(S[i, :] ** 2)
+        return recovered_var
+    
 
     def memory_savings(
         self, X: np.ndarray, U: np.ndarray, S: np.ndarray, V: np.ndarray, k: int
