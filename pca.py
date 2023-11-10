@@ -83,8 +83,8 @@ class PCA(object):
 
         """
         X_centered = self.center_data(data)
-        cumulative_variance = np.cumsum(self.S) / np.sum(self.S ** 2, axis=0)
-        K = np.argmax(cumulative_variance > retained_variance)
+        cumulative_variance = np.cumsum(self.S ** 2) / np.sum(self.S ** 2)
+        K = np.argmax(cumulative_variance >= retained_variance) + 1
         X_new = np.dot(X_centered, self.V[:K].T)
         return X_new
     
