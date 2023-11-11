@@ -16,7 +16,7 @@ class Regression(object):
         Return:
             A float value
         """
-        raise NotImplementedError
+        return np.sqrt(((pred - label) ** 2).mean())
 
     def construct_polynomial_feats(
         self, x: np.ndarray, degree: int
@@ -61,10 +61,16 @@ class Regression(object):
                 [ x_{3,1}    x_{3,2}]
                 [ x_{3,1}^2  x_{3,2}^2]
                 [ x_{3,1}^3  x_{3,2}^3]]]
-
         """
-
-        raise NotImplementedError
+        if len(x.shape) == 1:
+            feat = np.vander(x, degree+1, increasing=True)
+            assert feat.shape == (x.shape[0], degree + 1)
+        else:
+            D = x.shape[1]
+            poly = np.arange(degree + 1)
+            feat = np.power(x[:, np.newaxis, :], poly.reshape(1, -1, 1))
+            assert feat.shape == (x.shape[0], degree + 1, D)
+        return feat
 
     def predict(self, xtest: np.ndarray, weight: np.ndarray) -> np.ndarray:  # [5pts]
         """
@@ -78,7 +84,9 @@ class Regression(object):
         Return:
             prediction: (N,1) numpy array, the predicted labels
         """
-        raise NotImplementedError
+        prediction = xtest @ weight
+        assert prediction.shape == (xtest.shape[0], 1)
+        return prediction
 
     # =================
     # LINEAR REGRESSION
@@ -100,8 +108,10 @@ class Regression(object):
         Hints:
             - For pseudo inverse, you can use numpy linear algebra function (np.linalg.pinv)
         """
-
-        raise NotImplementedError
+        N, D = xtrain.shape[0], xtrain.shape[1] - 1
+        weight = np.linalg.pinv(xtrain) @ ytrain
+        assert weight.shape == (D + 1, 1)
+        return weight
 
     def linear_fit_GD(
         self,
@@ -181,8 +191,18 @@ class Regression(object):
             - For pseudo inverse, you can use numpy linear algebra function (np.linalg.pinv)
             - You should adjust your I matrix to handle the bias term differently than the rest of the terms
         """
+        N, D = xtrain.shape[0], xtrain.shape[1] - 1
+        xt_x = xtrain.T @ xtrain
+        assert xt_x.shape == (D + 1, D + 1)
 
-        raise NotImplementedError
+        lambda_I = c_lambda * np.eye(D + 1)
+        lambda_I[0, 0] = 0
+        assert lambda_I.shape == (D + 1, D + 1)
+
+        pinv = np.linalg.pinv(xt_x + lambda_I)
+        weight =  pinv @ xtrain.T @ ytrain
+        assert weight.shape == (D + 1, 1)
+        return weight
 
     def ridge_fit_GD(
         self,
@@ -271,7 +291,29 @@ class Regression(object):
                 split X and y into 10 equal-size folds
                 use 90 percent for training and 10 percent for test
         """
-        raise NotImplementedError
+        N, D = X.shape[0], X.shape[1] - 1
+        fold_size = N // kfold
+        loss_per_fold = []
+
+        for i in range(kfold):
+            xtest = X[i * fold_size : (i + 1) * fold_size] # (N / kfold, D + 1)
+            ytest = y[i * fold_size : (i + 1) * fold_size] # (N / kfold, 1)
+            assert xtest.shape == (fold_size, D + 1)
+            assert ytest.shape == (fold_size, 1)
+
+            xtrain = np.concatenate((X[: i * fold_size], X[(i + 1) * fold_size :])) # (N - N / kfold, D + 1)
+            ytrain = np.concatenate((y[: i * fold_size], y[(i + 1) * fold_size :])) # (N - N / kfold, 1)
+            assert xtrain.shape == (N - fold_size, D + 1)
+            assert ytrain.shape == (N - fold_size, 1)
+
+            weight = self.ridge_fit_closed(xtrain, ytrain, c_lambda)
+            assert weight.shape == (D + 1, 1)
+
+            pred = self.predict(xtest, weight)
+            assert pred.shape == ytest.shape
+            loss_per_fold.append(self.rmse(pred, ytest))
+
+        return loss_per_fold
 
     def hyperparameter_search(
         self, X: np.ndarray, y: np.ndarray, lambda_list: List[float], kfold: int
